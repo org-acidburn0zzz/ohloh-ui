@@ -3769,7 +3769,6 @@ CREATE TABLE oh.enlistments (
     updated_at timestamp without time zone DEFAULT timezone('UTC'::text, now()) NOT NULL,
     ignore text,
     code_location_id integer,
-    CONSTRAINT code_location_id_not_null_constraint CHECK ((code_location_id IS NOT NULL)),
     CONSTRAINT project_id_not_null_constraint CHECK ((project_id IS NOT NULL))
 );
 
@@ -7359,6 +7358,14 @@ ALTER TABLE ONLY fis.failure_groups
 
 ALTER TABLE ONLY fis.fisbot_events
     ADD CONSTRAINT fisbot_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: forges forges_pkey; Type: CONSTRAINT; Schema: fis; Owner: -
+--
+
+ALTER TABLE ONLY fis.forges
+    ADD CONSTRAINT forges_pkey PRIMARY KEY (id);
 
 
 --
