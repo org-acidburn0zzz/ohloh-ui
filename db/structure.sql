@@ -2116,6 +2116,127 @@ CREATE TABLE fis.code_sets (
 
 
 --
+-- Name: sloc_sets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sloc_sets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sloc_sets; Type: TABLE; Schema: fis; Owner: -
+--
+
+CREATE TABLE fis.sloc_sets (
+    id integer DEFAULT nextval('public.sloc_sets_id_seq'::regclass) NOT NULL,
+    code_set_id integer NOT NULL,
+    updated_on timestamp without time zone,
+    as_of integer,
+    code_set_time timestamp without time zone
+);
+
+
+--
+-- Name: positions; Type: TABLE; Schema: oh; Owner: -
+--
+
+CREATE TABLE oh.positions (
+    id integer NOT NULL,
+    project_id integer,
+    name_id integer,
+    account_id integer NOT NULL,
+    created_at timestamp without time zone,
+    title text,
+    organization_name text,
+    description text,
+    start_date timestamp without time zone,
+    stop_date timestamp without time zone,
+    ongoing boolean,
+    organization_id integer,
+    affiliation_type text DEFAULT 'unaffiliated'::text NOT NULL
+);
+
+
+--
+-- Name: projects_id_seq; Type: SEQUENCE; Schema: oh; Owner: -
+--
+
+CREATE SEQUENCE oh.projects_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: projects; Type: TABLE; Schema: oh; Owner: -
+--
+
+CREATE TABLE oh.projects (
+    id integer DEFAULT nextval('oh.projects_id_seq'::regclass) NOT NULL,
+    name text,
+    description text,
+    comments text,
+    best_analysis_id integer,
+    deleted boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    old_name text,
+    missing_source text,
+    logo_id integer,
+    vanity_url text,
+    downloadable boolean DEFAULT false,
+    scraped boolean DEFAULT false,
+    vector tsvector,
+    popularity_factor numeric,
+    user_count integer DEFAULT 0 NOT NULL,
+    rating_average real,
+    forge_id integer,
+    name_at_forge text,
+    owner_at_forge text,
+    active_committers integer DEFAULT 0,
+    kb_id integer,
+    organization_id integer,
+    activity_level_index integer,
+    uuid character varying,
+    best_project_security_set_id integer,
+    CONSTRAINT valid_missing_source CHECK (((missing_source IS NULL) OR (missing_source = 'not available'::text) OR (missing_source = 'not supported'::text)))
+);
+
+
+--
+-- Name: commit_contributors; Type: VIEW; Schema: fis; Owner: -
+--
+
+CREATE VIEW fis.commit_contributors AS
+ SELECT analysis_aliases.commit_name_id AS id,
+    sloc_sets.code_set_id,
+    analysis_aliases.commit_name_id AS name_id,
+    analysis_sloc_sets.analysis_id,
+    projects.id AS project_id,
+    positions.id AS position_id,
+    positions.account_id,
+        CASE
+            WHEN (positions.account_id IS NULL) THEN ((((projects.id)::bigint << 32) + (analysis_aliases.preferred_name_id)::bigint) + (B'10000000000000000000000000000000'::"bit")::bigint)
+            ELSE (((projects.id)::bigint << 32) + (positions.account_id)::bigint)
+        END AS contribution_id,
+        CASE
+            WHEN (positions.account_id IS NULL) THEN ((((projects.id)::bigint << 32) + (analysis_aliases.preferred_name_id)::bigint) + (B'10000000000000000000000000000000'::"bit")::bigint)
+            ELSE (positions.account_id)::bigint
+        END AS person_id
+   FROM ((((fis.analysis_sloc_sets
+     JOIN fis.sloc_sets ON ((analysis_sloc_sets.sloc_set_id = sloc_sets.id)))
+     JOIN oh.projects ON ((analysis_sloc_sets.analysis_id = projects.best_analysis_id)))
+     JOIN fis.analysis_aliases ON ((analysis_aliases.analysis_id = analysis_sloc_sets.analysis_id)))
+     LEFT JOIN oh.positions ON (((positions.project_id = projects.id) AND (positions.name_id = analysis_aliases.preferred_name_id))));
+
+
+--
 -- Name: commit_flags; Type: TABLE; Schema: fis; Owner: -
 --
 
@@ -2729,31 +2850,6 @@ CREATE TABLE fis.sloc_metrics (
     blanks_added integer DEFAULT 0 NOT NULL,
     blanks_removed integer DEFAULT 0 NOT NULL,
     sloc_set_id integer NOT NULL
-);
-
-
---
--- Name: sloc_sets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.sloc_sets_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: sloc_sets; Type: TABLE; Schema: fis; Owner: -
---
-
-CREATE TABLE fis.sloc_sets (
-    id integer DEFAULT nextval('public.sloc_sets_id_seq'::regclass) NOT NULL,
-    code_set_id integer NOT NULL,
-    updated_on timestamp without time zone,
-    as_of integer,
-    code_set_time timestamp without time zone
 );
 
 
@@ -3472,75 +3568,6 @@ CREATE TABLE oh.people (
     vector tsvector,
     popularity_factor numeric,
     CONSTRAINT people_name_fact_id_account_id CHECK ((((name_fact_id IS NOT NULL) AND (name_id IS NOT NULL) AND (project_id IS NOT NULL)) OR (account_id IS NOT NULL)))
-);
-
-
---
--- Name: positions; Type: TABLE; Schema: oh; Owner: -
---
-
-CREATE TABLE oh.positions (
-    id integer NOT NULL,
-    project_id integer,
-    name_id integer,
-    account_id integer NOT NULL,
-    created_at timestamp without time zone,
-    title text,
-    organization_name text,
-    description text,
-    start_date timestamp without time zone,
-    stop_date timestamp without time zone,
-    ongoing boolean,
-    organization_id integer,
-    affiliation_type text DEFAULT 'unaffiliated'::text NOT NULL
-);
-
-
---
--- Name: projects_id_seq; Type: SEQUENCE; Schema: oh; Owner: -
---
-
-CREATE SEQUENCE oh.projects_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: projects; Type: TABLE; Schema: oh; Owner: -
---
-
-CREATE TABLE oh.projects (
-    id integer DEFAULT nextval('oh.projects_id_seq'::regclass) NOT NULL,
-    name text,
-    description text,
-    comments text,
-    best_analysis_id integer,
-    deleted boolean DEFAULT false NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    old_name text,
-    missing_source text,
-    logo_id integer,
-    vanity_url text,
-    downloadable boolean DEFAULT false,
-    scraped boolean DEFAULT false,
-    vector tsvector,
-    popularity_factor numeric,
-    user_count integer DEFAULT 0 NOT NULL,
-    rating_average real,
-    forge_id integer,
-    name_at_forge text,
-    owner_at_forge text,
-    active_committers integer DEFAULT 0,
-    kb_id integer,
-    organization_id integer,
-    activity_level_index integer,
-    uuid character varying,
-    best_project_security_set_id integer,
-    CONSTRAINT valid_missing_source CHECK (((missing_source IS NULL) OR (missing_source = 'not available'::text) OR (missing_source = 'not supported'::text)))
 );
 
 
